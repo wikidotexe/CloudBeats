@@ -105,8 +105,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const filtersRef = useRef<BiquadFilterNode[]>([]);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const masterGainRef = useRef<GainNode | null>(null);
-  const initAudioContextRef = useRef<() => void | null>(null);
 
   const [state, setState] = useState<PlayerState>(() => {
     const saved = localStorage.getItem(PERSISTENCE_KEY);
@@ -181,7 +179,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     // Wait for first user interaction to create AudioContext if needed
     const initAudioContext = () => {
-      if (!audioCtxRef.current && audioRef.current) {
+      if (!audioCtxRef.current && audioRef.current && eqEnabledRefInternal.current) {
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         const ctx = new AudioContextClass();
         audioCtxRef.current = ctx;
@@ -196,10 +194,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         });
         filtersRef.current = filters;
 
-        const masterGain = ctx.createGain();
-        masterGain.gain.value = stateRef.current.volume;
-        masterGainRef.current = masterGain;
-
         // Connect chain
         const source = ctx.createMediaElementSource(audioRef.current);
         sourceNodeRef.current = source;
@@ -210,15 +204,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           lastNode.connect(f);
           lastNode = f;
         });
-
-        lastNode.connect(masterGain);
-        masterGain.connect(ctx.destination);
+        lastNode.connect(ctx.destination);
       } else if (audioCtxRef.current?.state === "suspended") {
         audioCtxRef.current.resume();
       }
     };
-
-    initAudioContextRef.current = initAudioContext;
 
     const handlePlay = () => {
       initAudioContext();
@@ -338,7 +328,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [state.eqEnabled, state.eqGains]);
 
   const playSong = useCallback((song: SubsonicSong, queue?: SubsonicSong[]) => {
-    initAudioContextRef.current?.(); // Sync init for volume control in PWA
     const audio = audioRef.current;
     if (!audio) return;
     const newQueue = queue || [song];
@@ -360,12 +349,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const togglePlay = useCallback(() => {
-    initAudioContextRef.current?.(); // Sync init for volume control in PWA
     const audio = audioRef.current;
     if (!audio || !state.currentSong) return;
     if (audio.paused) {
       audio.play();
       setState((s) => ({ ...s, isPlaying: true }));
+      // Ensure AudioContext is resumed on user interaction
+      if (audioCtxRef.current?.state === "suspended") {
+        audioCtxRef.current.resume();
+      }
     } else {
       audio.pause();
       setState((s) => ({ ...s, isPlaying: false }));
@@ -373,7 +365,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [state.currentSong]);
 
   const nextTrack = useCallback(() => {
-    initAudioContextRef.current?.(); // Sync init for volume control in PWA
     setState((prev) => {
       let nextIdx = prev.queueIndex + 1;
 
@@ -393,9 +384,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           audio.src = getStreamUrl(song.id);
           audio.load();
           audio.play().catch(e => console.error("Playback failed", e));
-          if (audioCtxRef.current?.state === "suspended") {
-            audioCtxRef.current.resume().catch(e => console.error("Failed to resume AudioContext", e));
-          }
+          if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
         }
         updateMediaSession(song);
         return { ...prev, currentSong: song, queueIndex: nextIdx, isPlaying: true };
@@ -409,9 +398,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           audio.src = getStreamUrl(song.id);
           audio.load();
           audio.play().catch(e => console.error("Playback failed", e));
-          if (audioCtxRef.current?.state === "suspended") {
-            audioCtxRef.current.resume().catch(e => console.error("Failed to resume AudioContext", e));
-          }
+          if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
         }
         updateMediaSession(song);
         return { ...prev, currentSong: song, queueIndex: 0, isPlaying: true };
@@ -422,7 +409,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const previous = useCallback(() => {
-    initAudioContextRef.current?.(); // Sync init for volume control in PWA
     const audio = audioRef.current;
     if (audio && audio.currentTime > 3) {
       audio.currentTime = 0;
@@ -539,13 +525,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const setVolume = useCallback((vol: number) => {
     const audio = audioRef.current;
-    if (masterGainRef.current && audioCtxRef.current) {
-      // Use gain node for volume (reliable on mobile)
-      masterGainRef.current.gain.setTargetAtTime(vol, audioCtxRef.current.currentTime, 0.05);
-      if (audio) audio.volume = 1; // Keep internal volume at 1.0
-    } else {
-      if (audio) audio.volume = vol;
-    }
+    if (audio) audio.volume = vol;
     setState((s) => ({ ...s, volume: vol }));
   }, []);
 
