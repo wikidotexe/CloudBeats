@@ -66,12 +66,6 @@ export default defineConfig(({ mode }) => ({
         enabled: true,
       },
     }),
-    {
-      name: "remove-deprecated-meta",
-      transformIndexHtml(html: string) {
-        return html.replace(/<meta name="apple-mobile-web-app-capable" content="yes"\/?>/g, "");
-      }
-    },
   ].filter(Boolean),
 
   resolve: {
