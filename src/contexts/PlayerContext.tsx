@@ -162,9 +162,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
     audioRef.current = audio;
 
+    const queueRefInternal = { current: state.queue };
+    const indexRefInternal = { current: state.queueIndex };
+    const repeatRefInternal = { current: state.repeatMode };
+    const shuffleRefInternal = { current: state.isShuffle };
+    const eqEnabledRefInternal = { current: state.eqEnabled };
+
     // Wait for first user interaction to create AudioContext if needed
     const initAudioContext = () => {
-      if (!audioCtxRef.current && audioRef.current) {
+      if (!audioCtxRef.current && audioRef.current && eqEnabledRefInternal.current) {
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         const ctx = new AudioContextClass();
         audioCtxRef.current = ctx;
@@ -218,65 +224,47 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     });
     audio.addEventListener("ended", () => {
-      // Use logic from nextTrack but specifically for 'ended' event
-      setState((prev) => {
-        if (prev.repeatMode === "one") {
-          if (audioRef.current) {
-            audioRef.current.currentTime = 0;
-            audioRef.current.play().catch(e => console.error("Playback failed", e));
-            // Ensure AudioContext is resumed on transition
-            if (audioCtxRef.current?.state === "suspended") {
-              audioCtxRef.current.resume();
-            }
-          }
-          return { ...prev, currentTime: 0, isPlaying: true };
-        }
+      const q = queueRefInternal.current;
+      const idx = indexRefInternal.current;
+      const repeat = repeatRefInternal.current;
+      const shuffle = shuffleRefInternal.current;
 
-        let nextIdx = prev.queueIndex + 1;
+      if (repeat === "one") {
+        audio.currentTime = 0;
+        audio.play().catch(e => console.error("Playback failed", e));
+        if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
+        setState(s => ({ ...s, currentTime: 0, isPlaying: true }));
+        return;
+      }
 
-        if (prev.isShuffle && prev.queue.length > 1) {
-          // simple random that isn't current
-          let rand;
-          do {
-            rand = Math.floor(Math.random() * prev.queue.length);
-          } while (rand === prev.queueIndex);
-          nextIdx = rand;
-        }
+      let nextIdx = idx + 1;
+      if (shuffle && q.length > 1) {
+        let rand;
+        do { rand = Math.floor(Math.random() * q.length); } while (rand === idx);
+        nextIdx = rand;
+      }
 
-        if (nextIdx < prev.queue.length) {
-          const song = prev.queue[nextIdx];
-          if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.src = getStreamUrl(song.id);
-            audioRef.current.load();
-            audioRef.current.play().catch(e => console.error("Playback failed", e));
-            // Ensure AudioContext is resumed on transition
-            if (audioCtxRef.current?.state === "suspended") {
-              audioCtxRef.current.resume();
-            }
-          }
-          updateMediaSession(song);
-          return { ...prev, currentSong: song, queueIndex: nextIdx, isPlaying: true };
-        }
-
-        if (prev.repeatMode === "all" && prev.queue.length > 0) {
-          const song = prev.queue[0];
-          if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.src = getStreamUrl(song.id);
-            audioRef.current.load();
-            audioRef.current.play().catch(e => console.error("Playback failed", e));
-            // Ensure AudioContext is resumed on transition
-            if (audioCtxRef.current?.state === "suspended") {
-              audioCtxRef.current.resume();
-            }
-          }
-          updateMediaSession(song);
-          return { ...prev, currentSong: song, queueIndex: 0, isPlaying: true };
-        }
-
-        return { ...prev, isPlaying: false };
-      });
+      if (nextIdx < q.length) {
+        const song = q[nextIdx];
+        audio.pause();
+        audio.src = getStreamUrl(song.id);
+        audio.load();
+        audio.play().catch(e => console.error("Playback failed", e));
+        if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
+        updateMediaSession(song);
+        setState(s => ({ ...s, currentSong: song, queueIndex: nextIdx, isPlaying: true }));
+      } else if (repeat === "all" && q.length > 0) {
+        const song = q[0];
+        audio.pause();
+        audio.src = getStreamUrl(song.id);
+        audio.load();
+        audio.play().catch(e => console.error("Playback failed", e));
+        if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
+        updateMediaSession(song);
+        setState(s => ({ ...s, currentSong: song, queueIndex: 0, isPlaying: true }));
+      } else {
+        setState(s => ({ ...s, isPlaying: false }));
+      }
     });
     audio.addEventListener("play", () => {
       if ("mediaSession" in navigator) {
@@ -299,7 +287,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
+    // Maintain internal refs for the event listeners
+    const observer = setInterval(() => {
+      queueRefInternal.current = stateRef.current.queue;
+      indexRefInternal.current = stateRef.current.queueIndex;
+      repeatRefInternal.current = stateRef.current.repeatMode;
+      shuffleRefInternal.current = stateRef.current.isShuffle;
+      eqEnabledRefInternal.current = stateRef.current.eqEnabled;
+    }, 100);
+
     return () => {
+      clearInterval(observer);
       audio.pause();
       audio.src = "";
       audio.removeEventListener("play", handlePlay);
@@ -374,6 +372,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           audio.src = getStreamUrl(song.id);
           audio.load();
           audio.play().catch(e => console.error("Playback failed", e));
+          if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
         }
         updateMediaSession(song);
         return { ...prev, currentSong: song, queueIndex: nextIdx, isPlaying: true };
@@ -387,14 +386,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           audio.src = getStreamUrl(song.id);
           audio.load();
           audio.play().catch(e => console.error("Playback failed", e));
+          if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
         }
         updateMediaSession(song);
         return { ...prev, currentSong: song, queueIndex: 0, isPlaying: true };
-      }
-
-      // Resume context on track change
-      if (audioCtxRef.current?.state === "suspended") {
-        audioCtxRef.current.resume();
       }
 
       return { ...prev, isPlaying: false };
@@ -416,12 +411,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           audio.src = getStreamUrl(song.id);
           audio.load();
           audio.play().catch(e => console.error("Playback failed", e));
+          if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
         }
         updateMediaSession(song);
         return { ...prev, currentSong: song, queueIndex: prevIdx, isPlaying: true };
       }
+      return prev;
     });
   }, []);
+
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   // Persist state on core changes
   useEffect(() => {
