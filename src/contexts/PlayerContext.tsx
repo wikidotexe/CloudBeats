@@ -151,58 +151,54 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const nextTrackRef = useRef<() => void>(() => { });
   const previousRef = useRef<() => void>(() => { });
   const lastUpdateRef = useRef<number>(0);
-  const stateRef = useRef(state);
 
   useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-    const audio = audioRef.current;
-
-    // Sync initial audio properties
+    const audio = new Audio();
+    audio.id = "pwa-audio-bridge";
     audio.crossOrigin = "anonymous";
-    audio.volume = stateRef.current.volume;
-    if (stateRef.current.currentSong && !audio.src) {
-      audio.src = getStreamUrl(stateRef.current.currentSong.id);
-      audio.currentTime = stateRef.current.currentTime;
+    // Using setAttribute to avoid TS issues with HTMLAudioElement
+    audio.setAttribute("playsinline", "true");
+    audio.preload = "auto";
+    audio.style.display = "none";
+    audio.volume = state.volume;
+
+    // Attach to DOM: Critical for many mobile browsers/PWAs to keep audio alive in background
+    document.body.appendChild(audio);
+
+    if (state.currentSong) {
+      audio.src = getStreamUrl(state.currentSong.id);
+      audio.currentTime = state.currentTime;
     }
+    audioRef.current = audio;
 
-    // Fixed internal refs for the event listeners
-    const queueRefInternal = { current: stateRef.current.queue };
-    const indexRefInternal = { current: stateRef.current.queueIndex };
-    const repeatRefInternal = { current: stateRef.current.repeatMode };
-    const shuffleRefInternal = { current: stateRef.current.isShuffle };
-    const eqEnabledRefInternal = { current: stateRef.current.eqEnabled };
+    const queueRefInternal = { current: state.queue };
+    const indexRefInternal = { current: state.queueIndex };
+    const repeatRefInternal = { current: state.repeatMode };
+    const shuffleRefInternal = { current: state.isShuffle };
+    const eqEnabledRefInternal = { current: state.eqEnabled };
 
-    // Update internal refs periodically to ensure event listeners have latest data
-    const observer = setInterval(() => {
-      queueRefInternal.current = stateRef.current.queue;
-      indexRefInternal.current = stateRef.current.queueIndex;
-      repeatRefInternal.current = stateRef.current.repeatMode;
-      shuffleRefInternal.current = stateRef.current.isShuffle;
-      eqEnabledRefInternal.current = stateRef.current.eqEnabled;
-    }, 200);
-
+    // Wait for first user interaction to create AudioContext if needed
     const initAudioContext = () => {
       if (!audioCtxRef.current && audioRef.current && eqEnabledRefInternal.current) {
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         const ctx = new AudioContextClass();
         audioCtxRef.current = ctx;
 
+        // Create filters
         const filters = EQ_FREQUENCIES.map((freq, i) => {
           const filter = ctx.createBiquadFilter();
           filter.type = i === 0 ? "lowshelf" : i === EQ_FREQUENCIES.length - 1 ? "highshelf" : "peaking";
           filter.frequency.value = freq;
-          filter.gain.value = stateRef.current.eqEnabled ? stateRef.current.eqGains[i] : 0;
+          filter.gain.value = state.eqEnabled ? state.eqGains[i] : 0;
           return filter;
         });
         filtersRef.current = filters;
 
+        // Connect chain
         const source = ctx.createMediaElementSource(audioRef.current);
         sourceNodeRef.current = source;
 
+        // Connect filters in series
         let lastNode: AudioNode = source;
         filters.forEach(f => {
           lastNode.connect(f);
@@ -214,15 +210,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    const handlePlay = () => initAudioContext();
+    const handlePlay = () => {
+      initAudioContext();
+    };
+
     audio.addEventListener("play", handlePlay);
 
     audio.addEventListener("timeupdate", () => {
       const now = Date.now();
+      // Throttle updates to ~250ms to prevent excessive rendering
       if (now - lastUpdateRef.current < 250) return;
       lastUpdateRef.current = now;
-      setState((s) => ({ ...s, currentTime: audio.currentTime, duration: audio.duration || 0 }));
 
+      setState((s) => ({ ...s, currentTime: audio.currentTime, duration: audio.duration || 0 }));
+      // Update position state for media session
       if ("mediaSession" in navigator && !isNaN(audio.duration)) {
         navigator.mediaSession.setPositionState({
           duration: audio.duration,
@@ -231,7 +232,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         });
       }
     });
-
     audio.addEventListener("ended", () => {
       const q = queueRefInternal.current;
       const idx = indexRefInternal.current;
@@ -275,12 +275,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setState(s => ({ ...s, isPlaying: false }));
       }
     });
-
     audio.addEventListener("play", () => {
-      if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "playing";
+      }
     });
     audio.addEventListener("pause", () => {
-      if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused";
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "paused";
+      }
     });
 
     const handleVisibilityChange = () => {
@@ -293,8 +296,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
+    // Maintain internal refs for the event listeners
+    const observer = setInterval(() => {
+      queueRefInternal.current = stateRef.current.queue;
+      indexRefInternal.current = stateRef.current.queueIndex;
+      repeatRefInternal.current = stateRef.current.repeatMode;
+      shuffleRefInternal.current = stateRef.current.isShuffle;
+      eqEnabledRefInternal.current = stateRef.current.eqEnabled;
+    }, 100);
+
     return () => {
       clearInterval(observer);
+      audio.pause();
+      audio.src = "";
+      if (document.body.contains(audio)) {
+        document.body.removeChild(audio);
+      }
       audio.removeEventListener("play", handlePlay);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
@@ -316,11 +333,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const newQueue = queue || [song];
     const idx = queue ? queue.findIndex((s) => s.id === song.id) : 0;
 
+    // Efficient switch
     audio.pause();
     audio.src = getStreamUrl(song.id);
-    audio.load();
+    audio.load(); // Force buffer start
     audio.play().catch(e => console.error("Playback failed", e));
 
+    // Ensure AudioContext is resumed on user interaction
     if (audioCtxRef.current?.state === "suspended") {
       audioCtxRef.current.resume();
     }
@@ -335,6 +354,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (audio.paused) {
       audio.play();
       setState((s) => ({ ...s, isPlaying: true }));
+      // Ensure AudioContext is resumed on user interaction
       if (audioCtxRef.current?.state === "suspended") {
         audioCtxRef.current.resume();
       }
@@ -412,6 +432,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+
   // Persist state on core changes
   useEffect(() => {
     const {
@@ -440,7 +463,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }));
   }, [state.currentSong, state.queue, state.queueIndex, state.volume, state.isShuffle, state.repeatMode, state.eqEnabled, state.eqPreset, state.eqGains]);
 
-  // Periodically persist time
+  // Periodically persist time to avoid heavy writes on every timeupdate
   useEffect(() => {
     const interval = setInterval(() => {
       if (audioRef.current) {
@@ -455,7 +478,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Sync event handler refs
+  // Keep refs updated for event handlers
   useEffect(() => {
     nextTrackRef.current = nextTrack;
     previousRef.current = previous;
@@ -496,11 +519,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const seek = useCallback((time: number) => {
-    if (audioRef.current) audioRef.current.currentTime = time;
+    const audio = audioRef.current;
+    if (audio) audio.currentTime = time;
   }, []);
 
   const setVolume = useCallback((vol: number) => {
-    if (audioRef.current) audioRef.current.volume = vol;
+    const audio = audioRef.current;
+    if (audio) audio.volume = vol;
     setState((s) => ({ ...s, volume: vol }));
   }, []);
 
@@ -521,6 +546,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const coverUrl = useCallback((id?: string) => {
+
     if (!id) return "";
     return getCoverArtUrl(id);
   }, []);
@@ -564,12 +590,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setEqGain
       }}
     >
-      <audio
-        ref={audioRef}
-        style={{ display: 'none' }}
-        playsInline
-        autoPlay={false}
-      />
+
       {children}
     </PlayerContext.Provider>
   );
