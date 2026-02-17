@@ -84,6 +84,8 @@ function setupMediaSessionHandlers(handlers: {
   next: () => void;
   previous: () => void;
   seekTo: (time: number) => void;
+  seekBackward: () => void;
+  seekForward: () => void;
 }) {
   if (!("mediaSession" in navigator)) return;
 
@@ -94,6 +96,8 @@ function setupMediaSessionHandlers(handlers: {
   navigator.mediaSession.setActionHandler("seekto", (details) => {
     if (details.seekTime !== undefined) handlers.seekTo(details.seekTime);
   });
+  navigator.mediaSession.setActionHandler("seekbackward", handlers.seekBackward);
+  navigator.mediaSession.setActionHandler("seekforward", handlers.seekForward);
 }
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
@@ -220,6 +224,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           if (audioRef.current) {
             audioRef.current.currentTime = 0;
             audioRef.current.play().catch(e => console.error("Playback failed", e));
+            // Ensure AudioContext is resumed on transition
+            if (audioCtxRef.current?.state === "suspended") {
+              audioCtxRef.current.resume();
+            }
           }
           return { ...prev, currentTime: 0, isPlaying: true };
         }
@@ -242,6 +250,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             audioRef.current.src = getStreamUrl(song.id);
             audioRef.current.load();
             audioRef.current.play().catch(e => console.error("Playback failed", e));
+            // Ensure AudioContext is resumed on transition
+            if (audioCtxRef.current?.state === "suspended") {
+              audioCtxRef.current.resume();
+            }
           }
           updateMediaSession(song);
           return { ...prev, currentSong: song, queueIndex: nextIdx, isPlaying: true };
@@ -254,6 +266,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             audioRef.current.src = getStreamUrl(song.id);
             audioRef.current.load();
             audioRef.current.play().catch(e => console.error("Playback failed", e));
+            // Ensure AudioContext is resumed on transition
+            if (audioCtxRef.current?.state === "suspended") {
+              audioCtxRef.current.resume();
+            }
           }
           updateMediaSession(song);
           return { ...prev, currentSong: song, queueIndex: 0, isPlaying: true };
@@ -273,10 +289,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        if (audioCtxRef.current?.state === "suspended" && audioRef.current && !audioRef.current.paused) {
+          audioCtxRef.current.resume();
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       audio.pause();
       audio.src = "";
       audio.removeEventListener("play", handlePlay);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -467,6 +494,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       seekTo: (time: number) => {
         const audio = audioRef.current;
         if (audio) audio.currentTime = time;
+      },
+      seekBackward: () => {
+        const audio = audioRef.current;
+        if (audio) audio.currentTime = Math.max(0, audio.currentTime - 10);
+      },
+      seekForward: () => {
+        const audio = audioRef.current;
+        if (audio) audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10);
       },
     });
   }, []);
