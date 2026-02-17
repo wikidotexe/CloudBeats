@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getStoredConfig } from "../services/subsonicApi";
 import AppSidebar from "../components/AppSidebar";
 import PlayerBar from "../components/PlayerBar";
@@ -36,12 +36,12 @@ const Index = () => {
     setSettingsOpen(false);
   };
 
-  const handleAlbumSelect = (id: string) => {
+  const handleAlbumSelect = useCallback((id: string) => {
     setSelectedAlbum(id);
     setActiveView("album-detail");
     setSearchResults(null);
     setSearchQuery("");
-  };
+  }, []);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -55,10 +55,19 @@ const Index = () => {
     setSearching(false);
   };
 
-  const clearSearch = () => {
+  const clearSearch = useCallback(() => {
     setSearchQuery("");
     setSearchResults(null);
-  };
+  }, []);
+
+  const handleViewChange = useCallback((v: string) => {
+    setActiveView(v);
+    setSelectedAlbum(null);
+  }, []);
+
+  const handleOpenSettings = useCallback(() => {
+    setSettingsOpen(true);
+  }, []);
 
   const renderContent = () => {
     if (!connected) {
@@ -134,8 +143,8 @@ const Index = () => {
             </SheetDescription>
             <AppSidebar
               activeView={activeView}
-              onViewChange={(v) => { setActiveView(v); setSelectedAlbum(null); }}
-              onOpenSettings={() => setSettingsOpen(true)}
+              onViewChange={handleViewChange}
+              onOpenSettings={handleOpenSettings}
               onAlbumSelect={handleAlbumSelect}
             />
           </SheetContent>
@@ -146,8 +155,8 @@ const Index = () => {
         <div className="hidden md:block">
           <AppSidebar
             activeView={activeView}
-            onViewChange={(v) => { setActiveView(v); setSelectedAlbum(null); }}
-            onOpenSettings={() => setSettingsOpen(true)}
+            onViewChange={handleViewChange}
+            onOpenSettings={handleOpenSettings}
             onAlbumSelect={handleAlbumSelect}
           />
         </div>

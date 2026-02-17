@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { getRandomSongs, SubsonicSong, getCoverArtUrl } from "../services/subsonicApi";
 import { usePlayer } from "../contexts/PlayerContext";
 import { Play, Clock, Music } from "lucide-react";
@@ -11,7 +11,7 @@ function formatDuration(sec?: number) {
     return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function TrackList() {
+const TrackList = memo(() => {
     const [songs, setSongs] = useState<SubsonicSong[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -121,4 +121,8 @@ export default function TrackList() {
             </div>
         </div>
     );
-}
+});
+
+TrackList.displayName = "TrackList";
+
+export default TrackList;

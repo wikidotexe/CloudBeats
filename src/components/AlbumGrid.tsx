@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { getAlbumList, SubsonicAlbum, getCoverArtUrl } from "../services/subsonicApi";
 import { motion } from "framer-motion";
 
@@ -6,7 +6,7 @@ interface AlbumGridProps {
   onAlbumSelect: (id: string) => void;
 }
 
-export default function AlbumGrid({ onAlbumSelect }: AlbumGridProps) {
+const AlbumGrid = memo(({ onAlbumSelect }: AlbumGridProps) => {
   const [albums, setAlbums] = useState<SubsonicAlbum[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -91,4 +91,8 @@ export default function AlbumGrid({ onAlbumSelect }: AlbumGridProps) {
       </div>
     </div>
   );
-}
+});
+
+AlbumGrid.displayName = "AlbumGrid";
+
+export default AlbumGrid;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { getAlbum, SubsonicAlbum, SubsonicSong, getCoverArtUrl } from "../services/subsonicApi";
 import { usePlayer } from "../contexts/PlayerContext";
 import { Play, ArrowLeft, Clock } from "lucide-react";
@@ -15,7 +15,7 @@ function formatDuration(sec?: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function AlbumView({ albumId, onBack }: AlbumViewProps) {
+const AlbumView = memo(({ albumId, onBack }: AlbumViewProps) => {
   const [album, setAlbum] = useState<SubsonicAlbum | null>(null);
   const [songs, setSongs] = useState<SubsonicSong[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,4 +114,8 @@ export default function AlbumView({ albumId, onBack }: AlbumViewProps) {
       </div>
     </div>
   );
-}
+});
+
+AlbumView.displayName = "AlbumView";
+
+export default AlbumView;

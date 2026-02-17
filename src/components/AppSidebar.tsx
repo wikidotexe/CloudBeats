@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo } from "react";
 import { Settings, Music, Disc3, Users } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -9,7 +9,7 @@ interface SidebarProps {
   onAlbumSelect: (id: string) => void;
 }
 
-export default function AppSidebar({ activeView, onViewChange, onOpenSettings, onAlbumSelect }: SidebarProps) {
+const AppSidebar = memo(({ activeView, onViewChange, onOpenSettings, onAlbumSelect }: SidebarProps) => {
   const navItems = [
     { id: "albums", label: "Albums", icon: Disc3 },
     { id: "artists", label: "Artists", icon: Users },
@@ -58,4 +58,8 @@ export default function AppSidebar({ activeView, onViewChange, onOpenSettings, o
       </div>
     </aside>
   );
-}
+});
+
+AppSidebar.displayName = "AppSidebar";
+
+export default AppSidebar;

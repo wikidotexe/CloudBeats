@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { getArtists, SubsonicArtist } from "../services/subsonicApi";
 
 interface ArtistListProps {
   onAlbumSelect: (id: string) => void;
 }
 
-export default function ArtistList({ onAlbumSelect }: ArtistListProps) {
+const ArtistList = memo(({ onAlbumSelect }: ArtistListProps) => {
   const [artists, setArtists] = useState<SubsonicArtist[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -60,4 +60,8 @@ export default function ArtistList({ onAlbumSelect }: ArtistListProps) {
       </div>
     </div>
   );
-}
+});
+
+ArtistList.displayName = "ArtistList";
+
+export default ArtistList;
