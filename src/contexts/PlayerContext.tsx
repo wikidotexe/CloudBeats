@@ -105,6 +105,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const filtersRef = useRef<BiquadFilterNode[]>([]);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
 
   const [state, setState] = useState<PlayerState>(() => {
     const saved = localStorage.getItem(PERSISTENCE_KEY);
@@ -179,7 +180,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     // Wait for first user interaction to create AudioContext if needed
     const initAudioContext = () => {
-      if (!audioCtxRef.current && audioRef.current && eqEnabledRefInternal.current) {
+      if (!audioCtxRef.current && audioRef.current) {
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         const ctx = new AudioContextClass();
         audioCtxRef.current = ctx;
@@ -194,6 +195,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         });
         filtersRef.current = filters;
 
+        const masterGain = ctx.createGain();
+        masterGain.gain.value = stateRef.current.volume;
+        masterGainRef.current = masterGain;
+
         // Connect chain
         const source = ctx.createMediaElementSource(audioRef.current);
         sourceNodeRef.current = source;
@@ -204,7 +209,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           lastNode.connect(f);
           lastNode = f;
         });
-        lastNode.connect(ctx.destination);
+
+        lastNode.connect(masterGain);
+        masterGain.connect(ctx.destination);
       } else if (audioCtxRef.current?.state === "suspended") {
         audioCtxRef.current.resume();
       }
@@ -525,7 +532,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const setVolume = useCallback((vol: number) => {
     const audio = audioRef.current;
-    if (audio) audio.volume = vol;
+    if (masterGainRef.current && audioCtxRef.current) {
+      // Use gain node for volume (reliable on mobile)
+      masterGainRef.current.gain.setTargetAtTime(vol, audioCtxRef.current.currentTime, 0.05);
+      if (audio) audio.volume = 1; // Keep internal volume at 1.0
+    } else {
+      if (audio) audio.volume = vol;
+    }
     setState((s) => ({ ...s, volume: vol }));
   }, []);
 
