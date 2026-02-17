@@ -153,6 +153,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const previousRef = useRef<() => void>(() => { });
   const lastUpdateRef = useRef<number>(0);
 
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+
   useEffect(() => {
     const audio = new Audio();
     audio.id = "pwa-audio-bridge";
@@ -190,31 +193,28 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           const filter = ctx.createBiquadFilter();
           filter.type = i === 0 ? "lowshelf" : i === EQ_FREQUENCIES.length - 1 ? "highshelf" : "peaking";
           filter.frequency.value = freq;
-          // Use refs for current state to avoid closure issues
-          filter.gain.value = eqEnabledRefInternal.current ? stateRef.current.eqGains[i] : 0;
+          filter.gain.value = stateRef.current.eqEnabled ? stateRef.current.eqGains[i] : 0;
           return filter;
         });
         filtersRef.current = filters;
 
-        // Create Volume Gain Node
-        const volumeGain = ctx.createGain();
-        volumeGain.gain.value = stateRef.current.volume;
-        gainNodeRef.current = volumeGain;
+        // Create Gain node for volume control (bypass mobile PWA volume limits)
+        const gainNode = ctx.createGain();
+        gainNode.gain.value = stateRef.current.volume;
+        gainNodeRef.current = gainNode;
 
         // Connect chain
         const source = ctx.createMediaElementSource(audioRef.current);
         sourceNodeRef.current = source;
 
-        // Connect filters in series
+        // Connect source -> filters -> gain -> destination
         let lastNode: AudioNode = source;
         filters.forEach(f => {
           lastNode.connect(f);
           lastNode = f;
         });
-
-        // Final volume stage
-        lastNode.connect(volumeGain);
-        volumeGain.connect(ctx.destination);
+        lastNode.connect(gainNode);
+        gainNode.connect(ctx.destination);
       } else if (audioCtxRef.current?.state === "suspended") {
         audioCtxRef.current.resume();
       }
@@ -442,8 +442,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const stateRef = useRef(state);
-  useEffect(() => { stateRef.current = state; }, [state]);
 
   // Persist state on core changes
   useEffect(() => {
@@ -535,11 +533,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const setVolume = useCallback((vol: number) => {
     const audio = audioRef.current;
-    if (audio) audio.volume = vol;
+    if (audio) {
+      // Standard volume (works in browser desktop)
+      audio.volume = vol;
+    }
 
-    if (gainNodeRef.current) {
-      // Smoothly transition volume to avoid clicks
-      gainNodeRef.current.gain.setTargetAtTime(vol, (audioCtxRef.current?.currentTime || 0), 0.05);
+    // Software volume control (works in PWA mobile)
+    if (gainNodeRef.current && audioCtxRef.current) {
+      gainNodeRef.current.gain.setTargetAtTime(vol, audioCtxRef.current.currentTime, 0.05);
     }
 
     setState((s) => ({ ...s, volume: vol }));
