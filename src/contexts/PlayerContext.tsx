@@ -105,6 +105,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const filtersRef = useRef<BiquadFilterNode[]>([]);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
 
   const [state, setState] = useState<PlayerState>(() => {
     const saved = localStorage.getItem(PERSISTENCE_KEY);
@@ -179,7 +180,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     // Wait for first user interaction to create AudioContext if needed
     const initAudioContext = () => {
-      if (!audioCtxRef.current && audioRef.current && eqEnabledRefInternal.current) {
+      if (!audioCtxRef.current && audioRef.current) {
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         const ctx = new AudioContextClass();
         audioCtxRef.current = ctx;
@@ -189,10 +190,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           const filter = ctx.createBiquadFilter();
           filter.type = i === 0 ? "lowshelf" : i === EQ_FREQUENCIES.length - 1 ? "highshelf" : "peaking";
           filter.frequency.value = freq;
-          filter.gain.value = state.eqEnabled ? state.eqGains[i] : 0;
+          // Use refs for current state to avoid closure issues
+          filter.gain.value = eqEnabledRefInternal.current ? stateRef.current.eqGains[i] : 0;
           return filter;
         });
         filtersRef.current = filters;
+
+        // Create Volume Gain Node
+        const volumeGain = ctx.createGain();
+        volumeGain.gain.value = stateRef.current.volume;
+        gainNodeRef.current = volumeGain;
 
         // Connect chain
         const source = ctx.createMediaElementSource(audioRef.current);
@@ -204,7 +211,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           lastNode.connect(f);
           lastNode = f;
         });
-        lastNode.connect(ctx.destination);
+
+        // Final volume stage
+        lastNode.connect(volumeGain);
+        volumeGain.connect(ctx.destination);
       } else if (audioCtxRef.current?.state === "suspended") {
         audioCtxRef.current.resume();
       }
@@ -526,6 +536,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const setVolume = useCallback((vol: number) => {
     const audio = audioRef.current;
     if (audio) audio.volume = vol;
+
+    if (gainNodeRef.current) {
+      // Smoothly transition volume to avoid clicks
+      gainNodeRef.current.gain.setTargetAtTime(vol, (audioCtxRef.current?.currentTime || 0), 0.05);
+    }
+
     setState((s) => ({ ...s, volume: vol }));
   }, []);
 
