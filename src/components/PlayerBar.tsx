@@ -1,6 +1,8 @@
 import { usePlayer } from "../contexts/PlayerContext";
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react";
 import { motion } from "framer-motion";
+import { Slider } from "@/components/ui/slider";
+import { Marquee } from "./Marquee";
 
 function formatTime(sec: number) {
   if (!sec || isNaN(sec)) return "0:00";
@@ -44,7 +46,10 @@ export default function PlayerBar() {
           )}
         </motion.div>
         <div className="min-w-0">
-          <p className="text-xs sm:text-sm font-medium text-foreground truncate group-hover/info:text-primary transition-colors">{currentSong.title}</p>
+          <Marquee
+            text={currentSong.title}
+            className="text-xs sm:text-sm font-medium text-foreground group-hover/info:text-primary transition-colors"
+          />
           <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{currentSong.artist}</p>
         </div>
       </div>
@@ -54,6 +59,16 @@ export default function PlayerBar() {
       <div className="flex-1 flex flex-col items-center gap-1 max-w-xl mx-auto">
 
         <div className="flex items-center gap-3 sm:gap-4">
+          <motion.button
+            whileHover={{ scale: 1.2 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={toggleShuffle}
+            className={`transition-colors p-1 ${isShuffle ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            title="Shuffle"
+          >
+            <Shuffle className="w-4 h-4" />
+          </motion.button>
+
           <motion.button
             whileHover={{ scale: 1.2, color: "var(--foreground)" }}
             whileTap={{ scale: 0.9 }}
@@ -92,25 +107,16 @@ export default function PlayerBar() {
           </motion.button>
         </div>
 
-        {/* Progress bar */}
-        <div className="w-full hidden sm:flex items-center gap-2">
-          <span className="text-xs text-muted-foreground w-10 text-right">{formatTime(currentTime)}</span>
-          <div
-            className="flex-1 h-1 bg-secondary rounded-full cursor-pointer group relative"
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const pct = (e.clientX - rect.left) / rect.width;
-              seek(pct * duration);
-            }}
-          >
-            <div
-              className="h-full bg-primary rounded-full relative transition-all"
-              style={{ width: `${progress}%` }}
-            >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-          </div>
-          <span className="text-xs text-muted-foreground w-10">{formatTime(duration)}</span>
+        <div className="w-full hidden sm:flex items-center gap-3">
+          <span className="text-[10px] text-muted-foreground w-10 text-right tabular-nums">{formatTime(currentTime)}</span>
+          <Slider
+            value={[currentTime]}
+            max={duration || 100}
+            step={1}
+            onValueChange={(vals) => seek(vals[0])}
+            className="flex-1"
+          />
+          <span className="text-[10px] text-muted-foreground w-10 tabular-nums">{formatTime(duration)}</span>
         </div>
       </div>
 
@@ -126,21 +132,13 @@ export default function PlayerBar() {
           >
             {volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </motion.button>
-          <div
-            className="flex-1 h-1.5 bg-secondary rounded-full cursor-pointer relative"
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-              setVolume(pct);
-            }}
-          >
-            <div
-              className="h-full bg-[#1DB954] rounded-full relative"
-              style={{ width: `${volume * 100}%` }}
-            >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-lg opacity-0 group-hover/volume:opacity-100 transition-opacity" />
-            </div>
-          </div>
+          <Slider
+            value={[volume]}
+            max={1}
+            step={0.01}
+            onValueChange={(vals) => setVolume(vals[0])}
+            className="flex-1"
+          />
         </div>
       </div>
 

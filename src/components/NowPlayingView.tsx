@@ -1,6 +1,8 @@
 import { usePlayer } from "../contexts/PlayerContext";
 import { ChevronDown, SkipBack, SkipForward, Play, Pause, Volume2, Shuffle, Repeat, Repeat1 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Slider } from "@/components/ui/slider";
+import { Marquee } from "./Marquee";
 
 export default function NowPlayingView() {
     const {
@@ -91,7 +93,10 @@ export default function NowPlayingView() {
                             transition={{ delay: 0.3 }}
                             className="mb-8"
                         >
-                            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 truncate">{currentSong.title}</h2>
+                            <Marquee
+                                text={currentSong.title}
+                                className="text-2xl sm:text-3xl font-bold text-foreground mb-1"
+                            />
                             <p className="text-lg text-muted-foreground truncate">{currentSong.artist}</p>
                         </motion.div>
 
@@ -102,21 +107,13 @@ export default function NowPlayingView() {
                             transition={{ delay: 0.4 }}
                             className="space-y-4 mb-8"
                         >
-                            <div
-                                className="h-1.5 bg-secondary rounded-full cursor-pointer group relative"
-                                onClick={(e) => {
-                                    const rect = e.currentTarget.getBoundingClientRect();
-                                    const pct = (e.clientX - rect.left) / rect.width;
-                                    seek(pct * duration);
-                                }}
-                            >
-                                <div
-                                    className="h-full bg-primary rounded-full relative transition-all"
-                                    style={{ width: `${progress}%` }}
-                                >
-                                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-primary shadow-lg" />
-                                </div>
-                            </div>
+                            <Slider
+                                value={[currentTime]}
+                                max={duration || 100}
+                                step={1}
+                                onValueChange={(vals) => seek(vals[0])}
+                                className="mb-2"
+                            />
                             <div className="flex justify-between text-xs font-medium text-muted-foreground">
                                 <span>{formatTime(currentTime)}</span>
                                 <span>{formatTime(duration)}</span>
@@ -130,6 +127,21 @@ export default function NowPlayingView() {
                             transition={{ delay: 0.5 }}
                             className="flex items-center justify-between mb-12 max-w-[400px] mx-auto w-full"
                         >
+                            <motion.button
+                                whileHover={{ scale: 1.2 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={toggleShuffle}
+                                className={`p-2 transition-colors relative ${isShuffle ? "text-primary" : "text-foreground/60 hover:text-foreground"}`}
+                            >
+                                <Shuffle className="w-6 h-6" />
+                                {isShuffle && (
+                                    <motion.div
+                                        layoutId="shuffle-dot"
+                                        className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full"
+                                    />
+                                )}
+                            </motion.button>
+
                             <motion.button
                                 whileHover={{ scale: 1.2, color: "var(--primary)" }}
                                 whileTap={{ scale: 0.9 }}
@@ -185,21 +197,13 @@ export default function NowPlayingView() {
                             className="flex items-center gap-4 px-4 py-2 bg-secondary/20 rounded-2xl group/volume"
                         >
                             <Volume2 className="w-5 h-5 text-muted-foreground" />
-                            <div
-                                className="flex-1 h-1.5 bg-secondary/50 rounded-full cursor-pointer relative"
-                                onClick={(e) => {
-                                    const rect = e.currentTarget.getBoundingClientRect();
-                                    const pct = (e.clientX - rect.left) / rect.width;
-                                    setVolume(Math.max(0, Math.min(1, pct)));
-                                }}
-                            >
-                                <div
-                                    className="h-full bg-[#1DB954] rounded-full relative"
-                                    style={{ width: `${volume * 100}%` }}
-                                >
-                                    <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-4 bg-white rounded-full shadow-xl" />
-                                </div>
-                            </div>
+                            <Slider
+                                value={[volume]}
+                                max={1}
+                                step={0.01}
+                                onValueChange={(vals) => setVolume(vals[0])}
+                                className="flex-1"
+                            />
                         </motion.div>
                     </div>
                 </motion.div>
