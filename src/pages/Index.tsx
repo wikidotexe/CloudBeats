@@ -103,7 +103,7 @@ const Index = () => {
 
     if (activeView === "album-detail" && selectedAlbum) {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin">
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-32">
           <AlbumView albumId={selectedAlbum} onBack={() => { setSelectedAlbum(null); setActiveView("albums"); }} />
         </div>
       );
@@ -111,7 +111,7 @@ const Index = () => {
 
     if (activeView === "artists") {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin">
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-32">
           <ArtistList onAlbumSelect={handleAlbumSelect} />
         </div>
       );
@@ -119,7 +119,7 @@ const Index = () => {
 
     if (activeView === "tracks") {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin">
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-32">
           <TrackList />
         </div>
       );
@@ -127,7 +127,7 @@ const Index = () => {
 
     if (activeView === "playlists") {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin">
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-32">
           <PlaylistList onPlaylistSelect={handlePlaylistSelect} />
         </div>
       );
@@ -135,14 +135,14 @@ const Index = () => {
 
     if (activeView === "playlist-detail" && selectedPlaylist) {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin">
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-32">
           <PlaylistView playlistId={selectedPlaylist} onBack={() => { setSelectedPlaylist(null); setActiveView("playlists"); }} />
         </div>
       );
     }
 
     return (
-      <div className="flex-1 overflow-y-auto scrollbar-thin">
+      <div className="flex-1 overflow-y-auto scrollbar-thin pb-32">
         <AlbumGrid onAlbumSelect={handleAlbumSelect} />
       </div>
     );
@@ -211,7 +211,7 @@ const Index = () => {
 
           <div className="flex-1 overflow-hidden flex flex-col relative">
             {searchResults ? (
-              <div className="absolute inset-0 z-20 bg-background overflow-y-auto scrollbar-thin p-8">
+              <div className="absolute inset-0 z-20 bg-background overflow-y-auto scrollbar-thin p-8 pb-32">
                 <div className="flex items-center justify-between mb-8">
                   <h2 className="text-3xl font-bold">Search Results</h2>
                   <button onClick={clearSearch} className="text-sm text-muted-foreground hover:text-primary transition-colors">Clear Results</button>
