@@ -27,15 +27,15 @@ const TrackList = memo(() => {
 
     if (loading) {
         return (
-            <div className="p-6">
-                <h2 className="font-display text-2xl font-bold text-foreground mb-6">All Tracks</h2>
-                <div className="space-y-3">
+            <div className="p-4 md:p-6">
+                <h2 className="font-display text-xl md:text-2xl font-bold text-foreground mb-6">All Tracks</h2>
+                <div className="space-y-2 md:space-y-3">
                     {Array.from({ length: 15 }).map((_, i) => (
-                        <div key={i} className="animate-pulse flex items-center gap-4 px-4 py-3">
-                            <div className="w-10 h-10 bg-secondary rounded" />
+                        <div key={i} className="animate-pulse flex items-center gap-4 px-2 md:px-4 py-2 md:py-3">
+                            <div className="w-8 h-8 md:w-10 md:h-10 bg-secondary rounded" />
                             <div className="flex-1 space-y-2">
-                                <div className="h-4 bg-secondary rounded w-1/3" />
-                                <div className="h-3 bg-secondary rounded w-1/4" />
+                                <div className="h-3 md:h-4 bg-secondary rounded w-1/3" />
+                                <div className="h-2 md:h-3 bg-secondary rounded w-1/4" />
                             </div>
                         </div>
                     ))}
@@ -54,13 +54,14 @@ const TrackList = memo(() => {
     }
 
     return (
-        <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-                <h2 className="font-display text-2xl font-bold text-foreground">All Tracks</h2>
-            </div>
+        <div className="p-4 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <header className="mb-6 md:mb-8 text-center sm:text-left">
+                <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground">All Tracks</h2>
+                <p className="text-xs md:text-sm text-muted-foreground mt-1">Every song in your collection</p>
+            </header>
 
-            <div className="rounded-lg overflow-hidden">
-                <div className="grid grid-cols-[3rem_1fr_auto] md:grid-cols-[3rem_1fr_1fr_auto] gap-4 px-4 py-2 text-xs text-muted-foreground uppercase tracking-wider border-b border-border">
+            <div className="bg-secondary/20 rounded-2xl md:rounded-3xl p-1 md:p-4">
+                <div className="grid grid-cols-[3rem_1fr_auto] md:grid-cols-[4rem_1fr_1fr_auto] gap-2 md:gap-4 px-3 md:px-6 py-3 md:py-4 text-[10px] md:text-xs text-muted-foreground uppercase tracking-widest font-bold border-b border-border/50">
                     <span className="text-center">#</span>
                     <span>Title</span>
                     <span className="hidden md:block">Album</span>
@@ -68,8 +69,7 @@ const TrackList = memo(() => {
                         <Clock className="w-3.5 h-3.5" />
                     </div>
                 </div>
-
-                <div className="divide-y divide-border/50">
+                <div className="mt-1 md:mt-2 space-y-0.5 md:space-y-1">
                     {songs.map((song, i) => {
                         const isActive = currentSong?.id === song.id;
                         const coverSrc = song.coverArt ? getCoverArtUrl(song.coverArt, 80) : "";
@@ -79,22 +79,26 @@ const TrackList = memo(() => {
                                 whileTap={{ scale: 0.99 }}
                                 key={song.id}
                                 onClick={() => playSong(song, songs)}
-                                className={`w-full grid grid-cols-[3rem_1fr_auto] md:grid-cols-[3rem_1fr_1fr_auto] gap-4 px-4 py-3 text-sm hover:bg-secondary/30 transition-colors group ${isActive ? "text-primary bg-secondary/20" : "text-foreground"
+                                className={`w-full grid grid-cols-[3rem_1fr_auto] md:grid-cols-[4rem_1fr_1fr_auto] gap-2 md:gap-4 px-3 md:px-6 py-2 md:py-3.5 rounded-lg md:rounded-xl text-[13px] md:text-sm hover:bg-secondary/40 transition-all group ${isActive ? "bg-primary/10 text-primary" : "text-foreground"
                                     }`}
                             >
                                 <div className="flex items-center justify-center relative">
                                     {isActive && isPlaying ? (
-                                        <span className="text-primary animate-pulse-glow">▶</span>
+                                        <div className="flex gap-0.5 items-end h-3">
+                                            <div className="w-0.5 bg-primary animate-music-bar-1" />
+                                            <div className="w-0.5 bg-primary animate-music-bar-2" />
+                                            <div className="w-0.5 bg-primary animate-music-bar-3" />
+                                        </div>
                                     ) : (
-                                        <div className="relative w-8 h-8 rounded overflow-hidden">
+                                        <div className="relative w-8 h-8 md:w-10 md:h-10 rounded-lg overflow-hidden shadow-md">
                                             {coverSrc ? (
                                                 <img src={coverSrc} alt="" className="w-full h-full object-cover group-hover:opacity-40 transition-opacity" />
                                             ) : (
                                                 <div className="w-full h-full bg-secondary flex items-center justify-center">
-                                                    <Music className="w-4 h-4 text-muted-foreground" />
+                                                    <Music className="w-4 h-4 text-muted-foreground transition-transform group-hover:scale-110" />
                                                 </div>
                                             )}
-                                            <Play className="absolute inset-0 m-auto w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            <Play className="absolute inset-0 m-auto w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity fill-current" />
                                         </div>
                                     )}
                                 </div>

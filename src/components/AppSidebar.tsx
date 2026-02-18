@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Settings, Music, Disc3, Users } from "lucide-react";
+import { Settings, Music, Disc3, Users, ListMusic } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface SidebarProps {
@@ -14,6 +14,7 @@ const AppSidebar = memo(({ activeView, onViewChange, onOpenSettings, onAlbumSele
     { id: "albums", label: "Albums", icon: Disc3 },
     { id: "artists", label: "Artists", icon: Users },
     { id: "tracks", label: "Tracks", icon: Music },
+    { id: "playlists", label: "Playlists", icon: ListMusic },
   ];
 
 

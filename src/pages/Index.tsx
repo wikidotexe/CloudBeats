@@ -6,6 +6,8 @@ import AlbumGrid from "../components/AlbumGrid";
 import AlbumView from "../components/AlbumView";
 import ArtistList from "../components/ArtistList";
 import TrackList from "../components/TrackList";
+import PlaylistList from "../components/PlaylistList";
+import PlaylistView from "../components/PlaylistView";
 import SettingsModal from "../components/SettingsModal";
 import { Music, Menu, Search, X } from "lucide-react";
 import { search, SubsonicAlbum, SubsonicSong } from "../services/subsonicApi";
@@ -15,6 +17,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from 
 const Index = () => {
   const [activeView, setActiveView] = useState("albums");
   const [selectedAlbum, setSelectedAlbum] = useState<string | null>(null);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [connected, setConnected] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,6 +46,13 @@ const Index = () => {
     setSearchQuery("");
   }, []);
 
+  const handlePlaylistSelect = useCallback((id: string) => {
+    setSelectedPlaylist(id);
+    setActiveView("playlist-detail");
+    setSearchResults(null);
+    setSearchQuery("");
+  }, []);
+
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setSearching(true);
@@ -63,6 +73,7 @@ const Index = () => {
   const handleViewChange = useCallback((v: string) => {
     setActiveView(v);
     setSelectedAlbum(null);
+    setSelectedPlaylist(null);
   }, []);
 
   const handleOpenSettings = useCallback(() => {
@@ -110,6 +121,22 @@ const Index = () => {
       return (
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           <TrackList />
+        </div>
+      );
+    }
+
+    if (activeView === "playlists") {
+      return (
+        <div className="flex-1 overflow-y-auto scrollbar-thin">
+          <PlaylistList onPlaylistSelect={handlePlaylistSelect} />
+        </div>
+      );
+    }
+
+    if (activeView === "playlist-detail" && selectedPlaylist) {
+      return (
+        <div className="flex-1 overflow-y-auto scrollbar-thin">
+          <PlaylistView playlistId={selectedPlaylist} onBack={() => { setSelectedPlaylist(null); setActiveView("playlists"); }} />
         </div>
       );
     }

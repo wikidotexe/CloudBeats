@@ -144,6 +144,20 @@ export async function getRandomSongs(size: number = 50): Promise<SubsonicSong[]>
 }
 
 
+export async function getPlaylists(): Promise<{ id: string; name: string; songCount: number; duration: number; coverArt?: string }[]> {
+  const res = await apiCall<any>("getPlaylists");
+  return res.playlists?.playlist || [];
+}
+
+export async function getPlaylist(id: string): Promise<{ id: string; name: string; songs: SubsonicSong[] }> {
+  const res = await apiCall<any>("getPlaylist", { id });
+  return {
+    id: res.playlist?.id,
+    name: res.playlist?.name,
+    songs: res.playlist?.entry || [],
+  };
+}
+
 export function getStreamUrl(songId: string): string {
   const config = getConfig();
   if (!config) return "";
