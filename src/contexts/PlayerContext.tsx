@@ -89,8 +89,16 @@ function setupMediaSessionHandlers(handlers: {
 }) {
   if (!("mediaSession" in navigator)) return;
 
-  navigator.mediaSession.setActionHandler("play", handlers.play);
-  navigator.mediaSession.setActionHandler("pause", handlers.pause);
+  const wrappedPlay = () => {
+    handlers.play();
+  };
+
+  const wrappedPause = () => {
+    handlers.pause();
+  };
+
+  navigator.mediaSession.setActionHandler("play", wrappedPlay);
+  navigator.mediaSession.setActionHandler("pause", wrappedPause);
   navigator.mediaSession.setActionHandler("nexttrack", handlers.next);
   navigator.mediaSession.setActionHandler("previoustrack", handlers.previous);
   navigator.mediaSession.setActionHandler("seekto", (details) => {
@@ -181,7 +189,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const shuffleRefInternal = { current: state.isShuffle };
 
     const handlePlay = () => {
-      if (stateRef.current.eqEnabled) {
+      // Always try to resume AudioContext on play, even if EQ is disabled
+      // This is crucial for background playback on mobile browsers
+      if (audioCtxRef.current?.state === "suspended") {
+        audioCtxRef.current.resume();
+      } else if (!audioCtxRef.current && stateRef.current.eqEnabled) {
         initAudioContext();
       }
     };
@@ -467,7 +479,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       play: () => {
         const audio = audioRef.current;
         if (audio) {
-          audio.play();
+          audio.play().catch(console.error);
+          if (audioCtxRef.current?.state === "suspended") {
+            audioCtxRef.current.resume();
+          }
           setState((s) => ({ ...s, isPlaying: true }));
         }
       },
@@ -478,8 +493,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           setState((s) => ({ ...s, isPlaying: false }));
         }
       },
-      next: () => nextTrackRef.current(),
-      previous: () => previousRef.current(),
+      next: () => {
+        nextTrackRef.current();
+        if (audioCtxRef.current?.state === "suspended") {
+          audioCtxRef.current.resume();
+        }
+      },
+      previous: () => {
+        previousRef.current();
+        if (audioCtxRef.current?.state === "suspended") {
+          audioCtxRef.current.resume();
+        }
+      },
       seekTo: (time: number) => {
         const audio = audioRef.current;
         if (audio) audio.currentTime = time;
