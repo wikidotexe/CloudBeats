@@ -232,14 +232,30 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         nextIdx = rand;
       }
 
-      if (nextIdx < queue.length) {
-        const nextSong = queue[nextIdx];
-        setState(s => ({ ...s, currentSong: nextSong, queueIndex: nextIdx, isPlaying: true, currentTime: 0 }));
-      } else if (repeatMode === "all" && queue.length > 0) {
-        const nextSong = queue[0];
-        setState(s => ({ ...s, currentSong: nextSong, queueIndex: 0, isPlaying: true, currentTime: 0 }));
+      if (nextIdx < queue.length || (repeatMode === "all" && queue.length > 0)) {
+        const actualNextIdx = nextIdx < queue.length ? nextIdx : 0;
+        const nextSong = queue[actualNextIdx];
+
+        // Synchronous track switching to prevent background throttling
+        audio.src = getStreamUrl(nextSong.id);
+        audio.play().catch(e => console.error("Auto-play failed in background", e));
+        updateMediaSession(nextSong);
+
+        setState(s => ({ ...s, currentSong: nextSong, queueIndex: actualNextIdx, isPlaying: true, currentTime: 0 }));
       } else {
         setState(s => ({ ...s, isPlaying: false }));
+      }
+    });
+
+    audio.addEventListener("error", (e) => {
+      console.error("Audio element error", e);
+      // Attempt recovery if it was playing
+      if (stateRef.current.isPlaying && stateRef.current.currentSong) {
+        setTimeout(() => {
+          audio.src = getStreamUrl(stateRef.current.currentSong!.id);
+          audio.load();
+          audio.play().catch(console.error);
+        }, 1000);
       }
     });
     audio.addEventListener("play", () => {
@@ -303,6 +319,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         lastNode.connect(f);
         lastNode = f;
       });
+
+      // Critical: Ensure destination is connected if EQ is enabled
       lastNode.connect(ctx.destination);
     } else if (audioCtxRef.current.state === "suspended") {
       audioCtxRef.current.resume();
@@ -354,12 +372,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (state.isPlaying) {
+      // Sync volume before playing
+      audio.volume = state.volume;
+
       audio.play().catch(e => {
-        console.error("Playback failed", e);
-        setState(s => ({ ...s, isPlaying: false }));
+        console.error("Playback failed in effect", e);
+        // Don't auto-stop on mobile, sometimes it's just a temporary throttle
       });
-      if (audioCtxRef.current?.state === "suspended") {
-        audioCtxRef.current.resume();
+
+      if (state.eqEnabled) {
+        initAudioContext();
+        if (audioCtxRef.current?.state === "suspended") {
+          audioCtxRef.current.resume();
+        }
       }
     } else {
       audio.pause();

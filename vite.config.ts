@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => ({
         navigateFallbackDenylist: [/^\/~oauth/],
         runtimeCaching: [
           {
-            urlPattern: /\/rest\/stream\?/,
+            urlPattern: ({ url }) => url.pathname.includes("/rest/stream"),
             handler: "NetworkOnly",
           },
           {
