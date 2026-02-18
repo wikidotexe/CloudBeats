@@ -89,16 +89,8 @@ function setupMediaSessionHandlers(handlers: {
 }) {
   if (!("mediaSession" in navigator)) return;
 
-  const wrappedPlay = () => {
-    handlers.play();
-  };
-
-  const wrappedPause = () => {
-    handlers.pause();
-  };
-
-  navigator.mediaSession.setActionHandler("play", wrappedPlay);
-  navigator.mediaSession.setActionHandler("pause", wrappedPause);
+  navigator.mediaSession.setActionHandler("play", handlers.play);
+  navigator.mediaSession.setActionHandler("pause", handlers.pause);
   navigator.mediaSession.setActionHandler("nexttrack", handlers.next);
   navigator.mediaSession.setActionHandler("previoustrack", handlers.previous);
   navigator.mediaSession.setActionHandler("seekto", (details) => {
@@ -159,15 +151,70 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const nextTrackRef = useRef<() => void>(() => { });
   const previousRef = useRef<() => void>(() => { });
   const lastUpdateRef = useRef<number>(0);
+  const wakeLockRef = useRef<any>(null);
+
+  const requestWakeLock = useCallback(async () => {
+    if ("wakeLock" in navigator && !wakeLockRef.current) {
+      try {
+        wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
+        wakeLockRef.current.addEventListener("release", () => {
+          wakeLockRef.current = null;
+        });
+      } catch (err) {
+        console.error("Wake Lock failed", err);
+      }
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(() => {
+    if (wakeLockRef.current) {
+      wakeLockRef.current.release();
+      wakeLockRef.current = null;
+    }
+  }, []);
+
+  const switchTrackSync = useCallback((song: SubsonicSong, index: number) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    // Direct manipulation bypasses React state throttling
+    audio.src = getStreamUrl(song.id);
+    audio.load();
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(e => console.error("Sync play failed", e));
+    }
+
+    updateMediaSession(song);
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.playbackState = "playing";
+    }
+
+    setState(s => ({
+      ...s,
+      currentSong: song,
+      queueIndex: index,
+      isPlaying: true,
+      currentTime: 0
+    }));
+  }, []);
 
   useEffect(() => {
     const audio = new Audio();
     audio.id = "pwa-audio-bridge";
     audio.crossOrigin = "anonymous";
-    // Using setAttribute to avoid TS issues with HTMLAudioElement
     audio.setAttribute("playsinline", "true");
     audio.preload = "auto";
-    audio.style.display = "none";
+
+    // Improved keep-alive: making it practically invisible but technically "on screen"
+    audio.style.position = "fixed";
+    audio.style.left = "0";
+    audio.style.top = "0";
+    audio.style.width = "1px";
+    audio.style.height = "1px";
+    audio.style.opacity = "0.01";
+    audio.style.pointerEvents = "none";
+    audio.style.zIndex = "-1";
 
     const updateAudioVolume = () => {
       audio.volume = stateRef.current.volume;
@@ -235,15 +282,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (nextIdx < queue.length || (repeatMode === "all" && queue.length > 0)) {
         const actualNextIdx = nextIdx < queue.length ? nextIdx : 0;
         const nextSong = queue[actualNextIdx];
-
-        // Synchronous track switching to prevent background throttling
-        audio.src = getStreamUrl(nextSong.id);
-        audio.play().catch(e => console.error("Auto-play failed in background", e));
-        updateMediaSession(nextSong);
-
-        setState(s => ({ ...s, currentSong: nextSong, queueIndex: actualNextIdx, isPlaying: true, currentTime: 0 }));
+        switchTrackSync(nextSong, actualNextIdx);
       } else {
         setState(s => ({ ...s, isPlaying: false }));
+        releaseWakeLock();
       }
     });
 
@@ -262,11 +304,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if ("mediaSession" in navigator) {
         navigator.mediaSession.playbackState = "playing";
       }
+      requestWakeLock();
     });
     audio.addEventListener("pause", () => {
       if ("mediaSession" in navigator) {
         navigator.mediaSession.playbackState = "paused";
       }
+      releaseWakeLock();
     });
 
     const handleVisibilityChange = () => {
@@ -274,6 +318,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (audioCtxRef.current?.state === "suspended" && audioRef.current && !audioRef.current.paused) {
           audioCtxRef.current.resume();
         }
+        requestWakeLock();
       }
     };
 
@@ -505,9 +550,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         const audio = audioRef.current;
         if (audio) {
           audio.play().catch(console.error);
-          if (audioCtxRef.current?.state === "suspended") {
-            audioCtxRef.current.resume();
-          }
           setState((s) => ({ ...s, isPlaying: true }));
         }
       },
@@ -519,15 +561,29 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       },
       next: () => {
-        nextTrackRef.current();
-        if (audioCtxRef.current?.state === "suspended") {
-          audioCtxRef.current.resume();
+        const { queue, queueIndex, repeatMode, isShuffle } = stateRef.current;
+        let nextIdx = queueIndex + 1;
+        if (isShuffle && queue.length > 1) {
+          let rand;
+          do { rand = Math.floor(Math.random() * queue.length); } while (rand === queueIndex);
+          nextIdx = rand;
+        }
+
+        if (nextIdx < queue.length || (repeatMode === "all" && queue.length > 0)) {
+          const actualNextIdx = nextIdx < queue.length ? nextIdx : 0;
+          switchTrackSync(queue[actualNextIdx], actualNextIdx);
         }
       },
       previous: () => {
-        previousRef.current();
-        if (audioCtxRef.current?.state === "suspended") {
-          audioCtxRef.current.resume();
+        const { queue, queueIndex, currentTime } = stateRef.current;
+        const audio = audioRef.current;
+        if (audio && audio.currentTime > 3) {
+          audio.currentTime = 0;
+          return;
+        }
+        const prevIdx = queueIndex - 1;
+        if (prevIdx >= 0) {
+          switchTrackSync(queue[prevIdx], prevIdx);
         }
       },
       seekTo: (time: number) => {
@@ -543,7 +599,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (audio) audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10);
       },
     });
-  }, []);
+  }, [switchTrackSync]);
 
   const seek = useCallback((time: number) => {
     const audio = audioRef.current;

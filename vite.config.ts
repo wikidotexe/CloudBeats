@@ -26,6 +26,8 @@ export default defineConfig(({ mode }) => ({
         theme_color: "#0d1117",
         background_color: "#0d1117",
         display: "standalone",
+        display_override: ["window-controls-overlay", "standalone", "minimal-ui"],
+        categories: ["music", "audio"],
         orientation: "portrait",
         start_url: "/",
         icons: [
