@@ -26,7 +26,6 @@ export default defineConfig(({ mode }) => ({
         theme_color: "#0d1117",
         background_color: "#0d1117",
         display: "standalone",
-        display_override: ["window-controls-overlay", "standalone", "minimal-ui"],
         categories: ["music", "audio"],
         orientation: "portrait",
         start_url: "/",
@@ -48,7 +47,9 @@ export default defineConfig(({ mode }) => ({
         navigateFallbackDenylist: [/^\/~oauth/],
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.includes("/rest/stream"),
+            // Explicitly exclude any URL with _sw_bypass=1 from being handled by Workbox
+            // This is a critical workaround for iOS Safari Media Range Request issues
+            urlPattern: ({ url }) => url.searchParams.has("_sw_bypass") || url.pathname.includes("/rest/stream"),
             handler: "NetworkOnly",
           },
           {
