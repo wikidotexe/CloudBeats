@@ -90,10 +90,7 @@ const Index = () => {
             </div>
             <h2 className="font-display text-2xl font-bold text-foreground mb-2">Welcome to CloudBeats</h2>
             <p className="text-muted-foreground mb-4 max-w-xs mx-auto">Connect to your Nextcloud Music server to start listening</p>
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-medium text-sm hover:scale-105 transition-transform glow-primary"
-            >
+            <button onClick={() => setSettingsOpen(true)} className="px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-medium text-sm hover:scale-105 transition-transform glow-primary">
               Connect Server
             </button>
           </div>
@@ -103,15 +100,21 @@ const Index = () => {
 
     if (activeView === "album-detail" && selectedAlbum) {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin pb-32">
-          <AlbumView albumId={selectedAlbum} onBack={() => { setSelectedAlbum(null); setActiveView("albums"); }} />
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 sm:pb-28 md:pb-32">
+          <AlbumView
+            albumId={selectedAlbum}
+            onBack={() => {
+              setSelectedAlbum(null);
+              setActiveView("albums");
+            }}
+          />
         </div>
       );
     }
 
     if (activeView === "artists") {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin pb-32">
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 sm:pb-28 md:pb-32">
           <ArtistList onAlbumSelect={handleAlbumSelect} />
         </div>
       );
@@ -119,7 +122,7 @@ const Index = () => {
 
     if (activeView === "tracks") {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin pb-32">
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 sm:pb-28 md:pb-32">
           <TrackList />
         </div>
       );
@@ -127,7 +130,7 @@ const Index = () => {
 
     if (activeView === "playlists") {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin pb-32">
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 sm:pb-28 md:pb-32">
           <PlaylistList onPlaylistSelect={handlePlaylistSelect} />
         </div>
       );
@@ -135,24 +138,29 @@ const Index = () => {
 
     if (activeView === "playlist-detail" && selectedPlaylist) {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin pb-32">
-          <PlaylistView playlistId={selectedPlaylist} onBack={() => { setSelectedPlaylist(null); setActiveView("playlists"); }} />
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 sm:pb-28 md:pb-32">
+          <PlaylistView
+            playlistId={selectedPlaylist}
+            onBack={() => {
+              setSelectedPlaylist(null);
+              setActiveView("playlists");
+            }}
+          />
         </div>
       );
     }
 
     return (
-      <div className="flex-1 overflow-y-auto scrollbar-thin pb-32">
+      <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 sm:pb-28 md:pb-32">
         <AlbumGrid onAlbumSelect={handleAlbumSelect} />
       </div>
     );
   };
 
-
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Mobile Header */}
-      <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-sidebar/50 backdrop-blur-md">
+      <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-sidebar/50 backdrop-blur-md flex-shrink-0">
         <div className="flex items-center gap-2">
           <Music className="w-6 h-6 text-primary" />
           <h1 className="font-display text-lg font-bold text-foreground">CloudBeats</h1>
@@ -165,31 +173,19 @@ const Index = () => {
           </SheetTrigger>
           <SheetContent side="left" className="p-0 border-r-sidebar-border bg-sidebar w-72">
             <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-            <SheetDescription className="sr-only">
-              Browse your music library and settings
-            </SheetDescription>
-            <AppSidebar
-              activeView={activeView}
-              onViewChange={handleViewChange}
-              onOpenSettings={handleOpenSettings}
-              onAlbumSelect={handleAlbumSelect}
-            />
+            <SheetDescription className="sr-only">Browse your music library and settings</SheetDescription>
+            <AppSidebar activeView={activeView} onViewChange={handleViewChange} onOpenSettings={handleOpenSettings} onAlbumSelect={handleAlbumSelect} />
           </SheetContent>
         </Sheet>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="hidden md:block">
-          <AppSidebar
-            activeView={activeView}
-            onViewChange={handleViewChange}
-            onOpenSettings={handleOpenSettings}
-            onAlbumSelect={handleAlbumSelect}
-          />
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        <div className="hidden md:block flex-shrink-0">
+          <AppSidebar activeView={activeView} onViewChange={handleViewChange} onOpenSettings={handleOpenSettings} onAlbumSelect={handleAlbumSelect} />
         </div>
-        <main className="flex-1 flex flex-col overflow-hidden relative">
+        <main className="flex-1 flex flex-col overflow-hidden relative min-h-0">
           {connected && (
-            <header className="flex items-center justify-end px-6 py-4 bg-background/80 backdrop-blur-md z-10">
+            <header className="flex items-center justify-end px-6 py-4 bg-background/80 backdrop-blur-md z-10 flex-shrink-0">
               <div className="relative w-full max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
@@ -214,7 +210,9 @@ const Index = () => {
               <div className="absolute inset-0 z-20 bg-background overflow-y-auto scrollbar-thin p-8 pb-32">
                 <div className="flex items-center justify-between mb-8">
                   <h2 className="text-3xl font-bold">Search Results</h2>
-                  <button onClick={clearSearch} className="text-sm text-muted-foreground hover:text-primary transition-colors">Clear Results</button>
+                  <button onClick={clearSearch} className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                    Clear Results
+                  </button>
                 </div>
 
                 <div className="space-y-12">
@@ -226,7 +224,11 @@ const Index = () => {
                           <button key={album.id} onClick={() => handleAlbumSelect(album.id)} className="group text-left">
                             <div className="aspect-square rounded-xl bg-secondary overflow-hidden mb-3">
                               {album.coverArt ? (
-                                <img src={searchQuery ? `/rest/getCoverArt?u=antigravity&t=token&s=salt&v=1.16.1&id=${album.coverArt}&size=300` : ""} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                <img
+                                  src={searchQuery ? `/rest/getCoverArt?u=antigravity&t=token&s=salt&v=1.16.1&id=${album.coverArt}&size=300` : ""}
+                                  alt=""
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-4xl">♪</div>
                               )}
@@ -266,7 +268,9 @@ const Index = () => {
                   )}
                 </div>
               </div>
-            ) : renderContent()}
+            ) : (
+              renderContent()
+            )}
           </div>
         </main>
       </div>
@@ -275,6 +279,5 @@ const Index = () => {
     </div>
   );
 };
-
 
 export default Index;

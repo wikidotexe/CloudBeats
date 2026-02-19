@@ -1,9 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
 
 @layer base {
   :root {
@@ -51,6 +50,15 @@
     --glass: 220 18% 10% / 0.7;
     --glass-border: 220 14% 22% / 0.5;
   }
+
+  /* Safe area insets for mobile */
+  @supports (padding: max(0px)) {
+    body {
+      padding-left: max(0px, env(safe-area-inset-left));
+      padding-right: max(0px, env(safe-area-inset-right));
+      padding-top: max(0px, env(safe-area-inset-top));
+    }
+  }
 }
 
 @layer base {
@@ -60,7 +68,7 @@
 
   body {
     @apply bg-background text-foreground font-sans;
-    font-family: 'Inter', sans-serif;
+    font-family: "Inter", sans-serif;
   }
 
   h1,
@@ -69,11 +77,15 @@
   h4,
   h5,
   h6 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: "Space Grotesk", sans-serif;
   }
 }
 
 @layer utilities {
+  .safe-area-inset {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
   .glass-panel {
     background: hsl(var(--glass));
     backdrop-filter: blur(20px);
@@ -106,7 +118,9 @@
   }
 
   .glow-primary {
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.3), 0 0 60px hsl(var(--primary) / 0.1);
+    box-shadow:
+      0 0 20px hsl(var(--primary) / 0.3),
+      0 0 60px hsl(var(--primary) / 0.1);
   }
 
   .animate-music-bar-1 {
@@ -122,7 +136,6 @@
   }
 
   @keyframes music-bar {
-
     0%,
     100% {
       height: 4px;
@@ -138,7 +151,6 @@
   }
 
   @keyframes pulse-glow {
-
     0%,
     100% {
       opacity: 1;

@@ -12,11 +12,7 @@ function formatTime(sec: number) {
 }
 
 export default function PlayerBar() {
-  const {
-    currentSong, isPlaying, currentTime, duration, volume,
-    togglePlay, next, previous, seek, setVolume, setNowPlayingOpen,
-    coverUrl, isShuffle, repeatMode, toggleShuffle, toggleRepeat
-  } = usePlayer();
+  const { currentSong, isPlaying, currentTime, duration, volume, togglePlay, next, previous, seek, setVolume, setNowPlayingOpen, coverUrl, isShuffle, repeatMode, toggleShuffle, toggleRepeat } = usePlayer();
 
   if (!currentSong) {
     return (
@@ -30,13 +26,10 @@ export default function PlayerBar() {
   const coverSrc = coverUrl(currentSong.coverArt);
 
   return (
-    <footer className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-4xl z-40">
-      <div className="bg-background/60 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[2rem] px-3 sm:px-5 py-2 flex items-center gap-3 sm:gap-5 h-16 sm:h-20 transition-all duration-300 hover:bg-background/70">
+    <footer className="fixed bottom-5 left-0 right-0 z-40 flex justify-center pointer-events-none md:bottom-6 md:left-1/2 md:-translate-x-1/2 md:w-[90%] md:max-w-4xl md:pointer-events-auto">
+      <div className="pointer-events-auto bg-background/60 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[2rem] mx-3 sm:mx-4 px-3 sm:px-5 py-2 flex items-center gap-3 sm:gap-5 h-16 sm:h-20 transition-all duration-300 hover:bg-background/70 safe-area-inset w-[calc(100%-1.5rem)] sm:w-[calc(100%-2rem)] md:w-full md:mx-0">
         {/* Song info */}
-        <div
-          className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 cursor-pointer group/info"
-          onClick={() => setNowPlayingOpen(true)}
-        >
+        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 cursor-pointer group/info" onClick={() => setNowPlayingOpen(true)}>
           <motion.div layoutId="album-art" className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl shadow-lg flex-shrink-0 overflow-hidden ring-1 ring-white/10">
             {coverSrc ? (
               <img src={coverSrc} alt="" className="w-full h-full object-cover group-hover/info:scale-110 transition-transform duration-500" />
@@ -47,10 +40,7 @@ export default function PlayerBar() {
             )}
           </motion.div>
           <div className="min-w-0 flex-1">
-            <Marquee
-              text={currentSong.title}
-              className="text-xs sm:text-sm font-bold text-foreground group-hover/info:text-primary transition-colors leading-tight"
-            />
+            <Marquee text={currentSong.title} className="text-xs sm:text-sm font-bold text-foreground group-hover/info:text-primary transition-colors leading-tight" />
             <p className="text-[9px] sm:text-[10px] text-muted-foreground/80 font-medium truncate mt-0.5">{currentSong.artist}</p>
           </div>
         </div>
@@ -68,12 +58,7 @@ export default function PlayerBar() {
               <Shuffle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.2, x: -2 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={previous}
-              className="text-muted-foreground hover:text-foreground transition-all p-1.5 rounded-full hover:bg-white/5"
-            >
+            <motion.button whileHover={{ scale: 1.2, x: -2 }} whileTap={{ scale: 0.9 }} onClick={previous} className="text-muted-foreground hover:text-foreground transition-all p-1.5 rounded-full hover:bg-white/5">
               <SkipBack className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
             </motion.button>
 
@@ -86,12 +71,7 @@ export default function PlayerBar() {
               {isPlaying ? <Pause className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5 fill-current" /> : <Play className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5 fill-current ml-0.5" />}
             </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.2, x: 2 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={next}
-              className="text-muted-foreground hover:text-foreground transition-all p-1.5 rounded-full hover:bg-white/5"
-            >
+            <motion.button whileHover={{ scale: 1.2, x: 2 }} whileTap={{ scale: 0.9 }} onClick={next} className="text-muted-foreground hover:text-foreground transition-all p-1.5 rounded-full hover:bg-white/5">
               <SkipForward className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
             </motion.button>
 
@@ -108,13 +88,7 @@ export default function PlayerBar() {
 
           <div className="w-full hidden sm:flex items-center gap-2.5 px-2">
             <span className="text-[9px] sm:text-[10px] font-medium text-muted-foreground w-8 text-right tabular-nums tracking-tighter">{formatTime(currentTime)}</span>
-            <Slider
-              value={[currentTime]}
-              max={duration || 100}
-              step={1}
-              onValueChange={(vals) => seek(vals[0])}
-              className="flex-1"
-            />
+            <Slider value={[currentTime]} max={duration || 100} step={1} onValueChange={(vals) => seek(vals[0])} className="flex-1" />
             <span className="text-[9px] sm:text-[10px] font-medium text-muted-foreground w-8 tabular-nums tracking-tighter">{formatTime(duration)}</span>
           </div>
         </div>
@@ -122,25 +96,13 @@ export default function PlayerBar() {
         {/* Volume */}
         <div className="hidden md:flex items-center justify-end flex-1 group/volume pr-1">
           <div className="flex items-center gap-2.5 w-28 bg-white/5 px-2.5 py-1.5 rounded-xl transition-all hover:bg-white/10 ring-1 ring-white/5">
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={() => setVolume(volume > 0 ? 0 : 0.8)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setVolume(volume > 0 ? 0 : 0.8)} className="text-muted-foreground hover:text-foreground transition-colors">
               {volume === 0 ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
             </motion.button>
-            <Slider
-              value={[volume]}
-              max={1}
-              step={0.01}
-              onValueChange={(vals) => setVolume(vals[0])}
-              className="flex-1"
-            />
+            <Slider value={[volume]} max={1} step={0.01} onValueChange={(vals) => setVolume(vals[0])} className="flex-1" />
           </div>
         </div>
       </div>
     </footer>
-
   );
 }
