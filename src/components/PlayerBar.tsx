@@ -26,7 +26,7 @@ export default function PlayerBar() {
   const coverSrc = coverUrl(currentSong.coverArt);
 
   return (
-    <footer className="fixed bottom-5 left-0 right-0 z-40 flex justify-center pointer-events-none md:bottom-6 md:left-1/2 md:-translate-x-1/2 md:w-[90%] md:max-w-4xl md:pointer-events-auto">
+    <footer className="fixed bottom-3 left-0 right-0 z-40 flex justify-center pointer-events-none md:bottom-6 md:left-1/2 md:-translate-x-1/2 md:w-[90%] md:max-w-4xl md:pointer-events-auto">
       <div className="pointer-events-auto bg-background/60 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[2rem] mx-3 sm:mx-4 px-3 sm:px-5 py-2 flex items-center gap-3 sm:gap-5 h-16 sm:h-20 transition-all duration-300 hover:bg-background/70 safe-area-inset w-[calc(100%-1.5rem)] sm:w-[calc(100%-2rem)] md:w-full md:mx-0">
         {/* Song info */}
         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 cursor-pointer group/info" onClick={() => setNowPlayingOpen(true)}>
