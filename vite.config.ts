@@ -45,21 +45,51 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         navigateFallbackDenylist: [/^\/~oauth/],
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
-            // Explicitly exclude any URL with _sw_bypass=1 from being handled by Workbox
-            // This is a critical workaround for iOS Safari Media Range Request issues
-            urlPattern: ({ url }) => url.searchParams.has("_sw_bypass") || url.pathname.includes("/rest/stream"),
-            handler: "NetworkOnly",
+            // Audio streams - Network First for real-time, but cache for offline
+            urlPattern: ({ url }) => url.pathname.includes("/rest/stream") || url.pathname.includes("/music") || url.searchParams.has("_sw_bypass"),
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "audio-streams",
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
           },
           {
+            // Cover art - Cache First
             urlPattern: /\/rest\/getCoverArt\?/,
             handler: "CacheFirst",
             options: {
               cacheName: "cover-art-cache",
               expiration: {
                 maxEntries: 200,
-                maxAgeSeconds: 60 * 60 * 24 * 30,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            // API calls - Stale While Revalidate
+            urlPattern: /\/rest\/get\w+/,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "api-cache",
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 1, // 1 hour
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
               },
             },
           },

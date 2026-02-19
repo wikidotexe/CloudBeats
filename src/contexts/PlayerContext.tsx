@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from "react";
 import { SubsonicSong, getStreamUrl, getCoverArtUrl } from "../services/subsonicApi";
+import { getAudioBackgroundManager } from "../utils/audioBackgroundHandler";
 
 export type RepeatMode = "none" | "all" | "one";
 interface PlayerState {
@@ -33,7 +34,6 @@ export const EQ_PRESETS: Record<string, number[]> = {
   custom: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 };
 
-
 interface PlayerContextType extends PlayerState {
   playSong: (song: SubsonicSong, queue?: SubsonicSong[]) => void;
   togglePlay: () => void;
@@ -50,7 +50,6 @@ interface PlayerContextType extends PlayerState {
   setEqGain: (index: number, gain: number) => void;
 }
 
-
 const PERSISTENCE_KEY = "cloudbeats_player_state";
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -62,31 +61,32 @@ export function usePlayer() {
 }
 
 function updateMediaSession(song: SubsonicSong | null) {
-  if (!("mediaSession" in navigator) || !song) return;
+  if (!song) return;
 
   const coverArt = song.coverArt ? getCoverArtUrl(song.coverArt, 512) : undefined;
 
-  navigator.mediaSession.metadata = new MediaMetadata({
+  const metadata = {
     title: song.title,
     artist: song.artist || "Unknown Artist",
     album: song.album || "Unknown Album",
-    artwork: coverArt
-      ? [
-        { src: coverArt, sizes: "512x512", type: "image/jpeg" },
-      ]
-      : [],
-  });
+    artwork: coverArt ? [{ src: coverArt, sizes: "512x512", type: "image/jpeg" }] : ([] as Array<{ src: string; sizes: string; type: string }>),
+  };
+
+  // Update native Media Session
+  if ("mediaSession" in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: metadata.title,
+      artist: metadata.artist,
+      album: metadata.album,
+      artwork: metadata.artwork,
+    });
+  }
+
+  // Update background audio manager
+  getAudioBackgroundManager().setupMediaSession(metadata);
 }
 
-function setupMediaSessionHandlers(handlers: {
-  play: () => void;
-  pause: () => void;
-  next: () => void;
-  previous: () => void;
-  seekTo: (time: number) => void;
-  seekBackward: () => void;
-  seekForward: () => void;
-}) {
+function setupMediaSessionHandlers(handlers: { play: () => void; pause: () => void; next: () => void; previous: () => void; seekTo: (time: number) => void; seekBackward: () => void; seekForward: () => void }) {
   if (!("mediaSession" in navigator)) return;
 
   navigator.mediaSession.setActionHandler("play", handlers.play);
@@ -105,6 +105,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const filtersRef = useRef<BiquadFilterNode[]>([]);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const bgAudioManagerRef = useRef(
+    getAudioBackgroundManager({
+      resumePlayback: true,
+      keepScreenOn: true,
+      enableNotification: true,
+    }),
+  );
 
   const [state, setState] = useState<PlayerState>(() => {
     const saved = localStorage.getItem(PERSISTENCE_KEY);
@@ -148,7 +155,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   });
 
   const stateRef = useRef(state);
-  useEffect(() => { stateRef.current = state; }, [state]);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const lastUpdateRef = useRef<number>(0);
   const wakeLockRef = useRef<any>(null);
@@ -186,6 +195,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.crossOrigin = "anonymous";
     audio.setAttribute("playsinline", "true");
     audio.setAttribute("webkit-playsinline", "true");
+    audio.setAttribute("x-webkit-airplay", "allow");
+    audio.setAttribute("controlsList", "nofullscreen");
     audio.preload = "auto";
     audio.title = "CloudBeats Playback";
 
@@ -200,6 +211,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     audio.volume = stateRef.current.volume;
     document.body.appendChild(audio);
+
+    // Initialize background audio handling
+    bgAudioManagerRef.current.initialize(audio).catch(console.error);
+
     return audio;
   }, []);
 
@@ -223,7 +238,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       sourceNodeRef.current = source;
 
       let lastNode: AudioNode = source;
-      filters.forEach(f => {
+      filters.forEach((f) => {
         lastNode.connect(f);
         lastNode = f;
       });
@@ -244,82 +259,92 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
     const playPromise = audio.play();
     if (playPromise !== undefined) {
-      playPromise.catch(e => console.error("Sync play failed", e));
+      playPromise.catch((e) => console.error("Sync play failed", e));
     }
 
     updateMediaSession(song);
-    setState(s => ({ ...s, currentSong: song, queueIndex: index, isPlaying: true, currentTime: 0 }));
+    bgAudioManagerRef.current.updatePlaybackState("playing");
+    setState((s) => ({ ...s, currentSong: song, queueIndex: index, isPlaying: true, currentTime: 0 }));
   }, []);
 
-  const setupListeners = useCallback((el: HTMLAudioElement) => {
-    const handlePlayInternal = () => {
-      if (audioCtxRef.current?.state === "suspended") {
-        audioCtxRef.current.resume();
-      } else if (!audioCtxRef.current && stateRef.current.eqEnabled) {
-        initAudioContext();
-      }
-      requestWakeLock();
-    };
+  const setupListeners = useCallback(
+    (el: HTMLAudioElement) => {
+      const handlePlayInternal = () => {
+        if (audioCtxRef.current?.state === "suspended") {
+          audioCtxRef.current.resume();
+        } else if (!audioCtxRef.current && stateRef.current.eqEnabled) {
+          initAudioContext();
+        }
+        requestWakeLock();
+        bgAudioManagerRef.current.updatePlaybackState("playing");
+      };
 
-    el.addEventListener("play", handlePlayInternal);
+      el.addEventListener("play", handlePlayInternal);
 
-    el.addEventListener("timeupdate", () => {
-      const now = Date.now();
-      if (now - lastUpdateRef.current < 250) return;
-      lastUpdateRef.current = now;
-      setState((s) => ({ ...s, currentTime: el.currentTime, duration: el.duration || 0 }));
-      if ("mediaSession" in navigator && !isNaN(el.duration)) {
-        navigator.mediaSession.setPositionState({
-          duration: el.duration,
-          playbackRate: el.playbackRate,
-          position: el.currentTime,
-        });
-      }
-    });
+      el.addEventListener("timeupdate", () => {
+        const now = Date.now();
+        if (now - lastUpdateRef.current < 250) return;
+        lastUpdateRef.current = now;
+        setState((s) => ({ ...s, currentTime: el.currentTime, duration: el.duration || 0 }));
+        if ("mediaSession" in navigator && !isNaN(el.duration)) {
+          navigator.mediaSession.setPositionState({
+            duration: el.duration,
+            playbackRate: el.playbackRate,
+            position: el.currentTime,
+          });
+          bgAudioManagerRef.current.updatePositionState(el.duration, el.currentTime, el.playbackRate);
+        }
+      });
 
-    el.addEventListener("ended", () => {
-      const { queue, queueIndex, repeatMode, isShuffle } = stateRef.current;
-      if (repeatMode === "one") {
-        el.currentTime = 0;
-        el.play().catch(console.error);
-        return;
-      }
-
-      let nextIdx = queueIndex + 1;
-      if (isShuffle && queue.length > 1) {
-        let rand;
-        do { rand = Math.floor(Math.random() * queue.length); } while (rand === queueIndex);
-        nextIdx = rand;
-      }
-
-      if (nextIdx < queue.length || (repeatMode === "all" && queue.length > 0)) {
-        const actualNextIdx = nextIdx < queue.length ? nextIdx : 0;
-        switchTrackSync(queue[actualNextIdx], actualNextIdx);
-      } else {
-        setState(s => ({ ...s, isPlaying: false }));
-        releaseWakeLock();
-      }
-    });
-
-    el.addEventListener("error", (e) => {
-      console.error("Audio error", e);
-      if (stateRef.current.isPlaying && stateRef.current.currentSong) {
-        setTimeout(() => {
-          el.src = getStreamUrl(stateRef.current.currentSong!.id);
-          el.load();
+      el.addEventListener("ended", () => {
+        const { queue, queueIndex, repeatMode, isShuffle } = stateRef.current;
+        if (repeatMode === "one") {
+          el.currentTime = 0;
           el.play().catch(console.error);
-        }, 1000);
-      }
-    });
+          return;
+        }
 
-    el.addEventListener("play", () => {
-      if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
-    });
-    el.addEventListener("pause", () => {
-      if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused";
-      releaseWakeLock();
-    });
-  }, [initAudioContext, requestWakeLock, releaseWakeLock, switchTrackSync]);
+        let nextIdx = queueIndex + 1;
+        if (isShuffle && queue.length > 1) {
+          let rand;
+          do {
+            rand = Math.floor(Math.random() * queue.length);
+          } while (rand === queueIndex);
+          nextIdx = rand;
+        }
+
+        if (nextIdx < queue.length || (repeatMode === "all" && queue.length > 0)) {
+          const actualNextIdx = nextIdx < queue.length ? nextIdx : 0;
+          switchTrackSync(queue[actualNextIdx], actualNextIdx);
+        } else {
+          setState((s) => ({ ...s, isPlaying: false }));
+          releaseWakeLock();
+        }
+      });
+
+      el.addEventListener("error", (e) => {
+        console.error("Audio error", e);
+        if (stateRef.current.isPlaying && stateRef.current.currentSong) {
+          setTimeout(() => {
+            el.src = getStreamUrl(stateRef.current.currentSong!.id);
+            el.load();
+            el.play().catch(console.error);
+          }, 1000);
+        }
+      });
+
+      el.addEventListener("play", () => {
+        if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
+        bgAudioManagerRef.current.updatePlaybackState("playing");
+      });
+      el.addEventListener("pause", () => {
+        if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused";
+        bgAudioManagerRef.current.updatePlaybackState("paused");
+        releaseWakeLock();
+      });
+    },
+    [initAudioContext, requestWakeLock, releaseWakeLock, switchTrackSync],
+  );
 
   useEffect(() => {
     const audio = createAudioElement();
@@ -359,7 +384,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (filtersRef.current.length > 0) {
       filtersRef.current.forEach((filter, i) => {
         const targetGain = state.eqEnabled ? state.eqGains[i] : 0;
-        filter.gain.setTargetAtTime(targetGain, (audioCtxRef.current?.currentTime || 0), 0.1);
+        filter.gain.setTargetAtTime(targetGain, audioCtxRef.current?.currentTime || 0, 0.1);
       });
     }
   }, [state.eqEnabled, state.eqGains, state.isPlaying, initAudioContext]);
@@ -413,7 +438,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       let nextIdx = prev.queueIndex + 1;
       if (prev.isShuffle && prev.queue.length > 1) {
         let rand;
-        do { rand = Math.floor(Math.random() * prev.queue.length); } while (rand === prev.queueIndex);
+        do {
+          rand = Math.floor(Math.random() * prev.queue.length);
+        } while (rand === prev.queueIndex);
         nextIdx = rand;
       }
       if (nextIdx < prev.queue.length) return { ...prev, currentSong: prev.queue[nextIdx], queueIndex: nextIdx, isPlaying: true, currentTime: 0 };
@@ -475,7 +502,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         let nextIdx = queueIndex + 1;
         if (isShuffle && queue.length > 1) {
           let rand;
-          do { rand = Math.floor(Math.random() * queue.length); } while (rand === queueIndex);
+          do {
+            rand = Math.floor(Math.random() * queue.length);
+          } while (rand === queueIndex);
           nextIdx = rand;
         }
         if (nextIdx < queue.length || (repeatMode === "all" && queue.length > 0)) {
@@ -493,14 +522,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         const prevIdx = queueIndex - 1;
         if (prevIdx >= 0) switchTrackSync(queue[prevIdx], prevIdx);
       },
-      seekTo: (time: number) => { if (audioRef.current) audioRef.current.currentTime = time; },
-      seekBackward: () => { if (audioRef.current) audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 10); },
-      seekForward: () => { if (audioRef.current) audioRef.current.currentTime = Math.min(audioRef.current.duration || 0, audioRef.current.currentTime + 10); },
+      seekTo: (time: number) => {
+        if (audioRef.current) audioRef.current.currentTime = time;
+      },
+      seekBackward: () => {
+        if (audioRef.current) audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 10);
+      },
+      seekForward: () => {
+        if (audioRef.current) audioRef.current.currentTime = Math.min(audioRef.current.duration || 0, audioRef.current.currentTime + 10);
+      },
     });
   }, [switchTrackSync]);
 
   const toggleEq = useCallback(() => {
-    setState(s => {
+    setState((s) => {
       const nextEq = !s.eqEnabled;
       if (!nextEq && audioRef.current) {
         const audio = audioRef.current;
@@ -528,22 +563,32 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         togglePlay,
         next: nextTrack,
         previous,
-        seek: (t) => { if (audioRef.current) audioRef.current.currentTime = t; },
-        setVolume: (v) => { if (audioRef.current) audioRef.current.volume = v; setState(s => ({ ...s, volume: v })); },
-        setNowPlayingOpen: (o) => setState(s => ({ ...s, isNowPlayingOpen: o })),
-        toggleShuffle: () => setState(s => ({ ...s, isShuffle: !s.isShuffle })),
-        toggleRepeat: () => setState(s => {
-          const modes: RepeatMode[] = ["none", "all", "one"];
-          return { ...s, repeatMode: modes[(modes.indexOf(s.repeatMode) + 1) % modes.length] };
-        }),
-        coverUrl: (id) => id ? getCoverArtUrl(id) : "",
+        seek: (t) => {
+          if (audioRef.current) audioRef.current.currentTime = t;
+        },
+        setVolume: (v) => {
+          if (audioRef.current) audioRef.current.volume = v;
+          setState((s) => ({ ...s, volume: v }));
+        },
+        setNowPlayingOpen: (o) => setState((s) => ({ ...s, isNowPlayingOpen: o })),
+        toggleShuffle: () => setState((s) => ({ ...s, isShuffle: !s.isShuffle })),
+        toggleRepeat: () =>
+          setState((s) => {
+            const modes: RepeatMode[] = ["none", "all", "one"];
+            return { ...s, repeatMode: modes[(modes.indexOf(s.repeatMode) + 1) % modes.length] };
+          }),
+        coverUrl: (id) => (id ? getCoverArtUrl(id) : ""),
         toggleEq,
-        setEqPreset: (p) => { if (p === "custom") setState(s => ({ ...s, eqPreset: "custom" })); else if (EQ_PRESETS[p]) setState(s => ({ ...s, eqPreset: p, eqGains: EQ_PRESETS[p] })); },
-        setEqGain: (i, g) => setState(s => {
-          const newGains = [...s.eqGains];
-          newGains[i] = g;
-          return { ...s, eqGains: newGains, eqPreset: "custom" };
-        })
+        setEqPreset: (p) => {
+          if (p === "custom") setState((s) => ({ ...s, eqPreset: "custom" }));
+          else if (EQ_PRESETS[p]) setState((s) => ({ ...s, eqPreset: p, eqGains: EQ_PRESETS[p] }));
+        },
+        setEqGain: (i, g) =>
+          setState((s) => {
+            const newGains = [...s.eqGains];
+            newGains[i] = g;
+            return { ...s, eqGains: newGains, eqPreset: "custom" };
+          }),
       }}
     >
       {children}
