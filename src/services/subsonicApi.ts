@@ -191,11 +191,10 @@ export function getStreamUrl(songId: string): string {
   const params = buildParams(config);
   params.set("id", songId);
   params.set("estimateContentLength", "true");
-  // Suggest a reasonable bitrate for streaming if supported by server
-  // params.set("maxBitRate", "320"); 
 
   // Add an explicit bypass parameter to ensure it doesn't get intercepted by the service worker on iOS
-  return `${baseUrl(config)}/stream?${params.toString()}&_sw_bypass=1`;
+  // Using Date.now() ensures it's unique even after a skip
+  return `${baseUrl(config)}/stream?${params.toString()}&_sw_bypass=${Date.now()}`;
 }
 
 export function getCoverArtUrl(coverArtId: string, size: number = 300): string {
