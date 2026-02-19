@@ -100,7 +100,7 @@ const Index = () => {
 
     if (activeView === "album-detail" && selectedAlbum) {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 sm:pb-28 md:pb-32">
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-28 sm:pb-32 md:pb-32">
           <AlbumView
             albumId={selectedAlbum}
             onBack={() => {
@@ -114,7 +114,7 @@ const Index = () => {
 
     if (activeView === "artists") {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 sm:pb-28 md:pb-32">
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-28 sm:pb-32 md:pb-32">
           <ArtistList onAlbumSelect={handleAlbumSelect} />
         </div>
       );
@@ -122,7 +122,7 @@ const Index = () => {
 
     if (activeView === "tracks") {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 sm:pb-28 md:pb-32">
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-28 sm:pb-32 md:pb-32">
           <TrackList />
         </div>
       );
@@ -130,7 +130,7 @@ const Index = () => {
 
     if (activeView === "playlists") {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 sm:pb-28 md:pb-32">
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-28 sm:pb-32 md:pb-32">
           <PlaylistList onPlaylistSelect={handlePlaylistSelect} />
         </div>
       );
@@ -138,7 +138,7 @@ const Index = () => {
 
     if (activeView === "playlist-detail" && selectedPlaylist) {
       return (
-        <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 sm:pb-28 md:pb-32">
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-28 sm:pb-32 md:pb-32">
           <PlaylistView
             playlistId={selectedPlaylist}
             onBack={() => {
@@ -151,7 +151,7 @@ const Index = () => {
     }
 
     return (
-      <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 sm:pb-28 md:pb-32">
+      <div className="flex-1 overflow-y-auto scrollbar-thin pb-28 sm:pb-32 md:pb-32">
         <AlbumGrid onAlbumSelect={handleAlbumSelect} />
       </div>
     );
