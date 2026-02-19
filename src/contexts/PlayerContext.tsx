@@ -254,9 +254,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     audio.src = getStreamUrl(song.id);
     audio.load();
+
+    // Resume audio context first if suspended
+    if (audioCtxRef.current?.state === "suspended") {
+      audioCtxRef.current.resume();
+    }
+
     if ("mediaSession" in navigator) {
       navigator.mediaSession.playbackState = "playing";
     }
+
     const playPromise = audio.play();
     if (playPromise !== undefined) {
       playPromise.catch((e) => console.error("Sync play failed", e));
@@ -300,6 +307,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         const { queue, queueIndex, repeatMode, isShuffle } = stateRef.current;
         if (repeatMode === "one") {
           el.currentTime = 0;
+          // Resume audio context if suspended and initiate playback
+          if (audioCtxRef.current?.state === "suspended") {
+            audioCtxRef.current.resume();
+          }
           el.play().catch(console.error);
           return;
         }
@@ -328,6 +339,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           setTimeout(() => {
             el.src = getStreamUrl(stateRef.current.currentSong!.id);
             el.load();
+            // Resume audio context if suspended before playing
+            if (audioCtxRef.current?.state === "suspended") {
+              audioCtxRef.current.resume();
+            }
             el.play().catch(console.error);
           }, 1000);
         }
@@ -410,23 +425,38 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     if (state.isPlaying) {
       audio.volume = state.volume;
-      audio.play().catch(console.error);
-      if (state.eqEnabled) {
+      // Resume audio context first if suspended
+      if (audioCtxRef.current?.state === "suspended") {
+        audioCtxRef.current.resume();
+      }
+      // Initialize audio context if EQ is enabled
+      if (state.eqEnabled && !audioCtxRef.current) {
         initAudioContext();
-        if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
+      }
+      // Now play
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => console.error("Play failed:", err));
       }
     } else {
       audio.pause();
     }
-  }, [state.currentSong?.id, state.isPlaying]);
+  }, [state.currentSong?.id, state.isPlaying, state.eqEnabled, initAudioContext]);
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
     if (!audio || !state.currentSong) return;
+
     if (audio.paused) {
-      audio.play().catch(console.error);
+      // Resume audio context first if suspended
+      if (audioCtxRef.current?.state === "suspended") {
+        audioCtxRef.current.resume();
+      }
+      // Call play directly
+      audio.play().catch((err) => {
+        console.error("Play failed:", err);
+      });
       setState((s) => ({ ...s, isPlaying: true }));
-      if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
     } else {
       audio.pause();
       setState((s) => ({ ...s, isPlaying: false }));
@@ -486,6 +516,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       play: () => {
         const audio = audioRef.current;
         if (audio) {
+          // Resume audio context first if suspended
+          if (audioCtxRef.current?.state === "suspended") {
+            audioCtxRef.current.resume();
+          }
           audio.play().catch(console.error);
           setState((s) => ({ ...s, isPlaying: true }));
         }
@@ -546,7 +580,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (song) {
           newAudio.src = getStreamUrl(song.id);
           newAudio.currentTime = time;
-          if (playing) newAudio.play().catch(console.error);
+          if (playing) {
+            // Resume audio context if suspended before playing
+            if (audioCtxRef.current?.state === "suspended") {
+              audioCtxRef.current.resume();
+            }
+            newAudio.play().catch(console.error);
+          }
         }
         audioRef.current = newAudio;
         setupListeners(newAudio);
